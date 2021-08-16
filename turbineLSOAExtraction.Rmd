@@ -1,0 +1,70 @@
+---
+title: Raster Extraction
+author: Michael Harper
+date: 17th August 2021
+---
+
+This notebook loads and extracts summary statistics from the acceptance rates of wind turbines. For more information about what the data represents, read the paper https://www.sciencedirect.com/science/article/pii/S0301421519300023#s0105
+
+This R script is written for transparency and also to make it easy to tweak in case you need to do anything slightly different :)
+
+# Setup
+
+```{r setup, include = FALSE}
+library(raster)
+library(sf)
+library(rgdal)
+library(exactextractr)
+library(ggplot2)
+library(tidyverse)
+```
+
+# Turbine Data
+
+Turbine acceptances rates data downloaded from https://data.mendeley.com/datasets/cwn2y977nn/1 . All other supplementary data is included at this website:
+
+```{r}
+raster_acceptance <- raster::raster("data/inputs/PredictedRaster.tif")
+```
+
+## LSOA Boundaries
+
+LSOA boundaries downloaded from: https://geoportal.statistics.gov.uk/. Lower Super Output Areas for England and Wales:
+
+Have used the clipped and generalised files, which are accuarate to 20 metres. These are slightly smaller to download and easier to use for geoprocessing, and are of sufficient accuracy for the rasters which are 100m resolution. 
+
+https://geoportal.statistics.gov.uk/datasets/lower-layer-super-output-areas-december-2011-boundaries-full-clipped-bfc-ew-v3/explore
+
+```{r}
+shp_lsoa <- sf::read_sf("data/inputs/Lower_Layer_Super_Output_Areas_(December_2011)_Boundaries_Generalised_Clipped_(BGC)_EW_V3.shp")
+```
+
+## Extract Values
+There are different stats we can extract. For starters, just get the min, max and mean. See the README for more options from `exact_extract`
+
+```{r}
+results <-  cbind(shp_lsoa, exact_extract(raster_acceptance, shp_lsoa, c('min', 'max', 'mean'), progress = FALSE))
+
+results %>%
+  sf::st_drop_geometry() %>%
+  select(c(LSOA11CD, min, max, mean)) %>%
+  head()
+```
+Just look at the results:
+
+```{r}
+ggplot(results) +
+  geom_sf(aes(fill = mean), colour = NA) +
+  labs(title = "LSOA boundaries average scores") +
+  scale_fill_gradient(low = "red", high = "green")
+```
+
+Saved in the repo for your use :)
+
+```{r}
+results %>%
+  write_csv("data/out/lsoa_turbine_scores.csv")
+```
+
+
+
